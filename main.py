@@ -18,7 +18,6 @@ st.caption("Enter your subjects, core interests, or dream industries to map out 
 # -----------------------------------------------------------------------------
 # 2. API Key & Client Authentication
 # -----------------------------------------------------------------------------
-# Check for API key in Streamlit secrets or sidebar
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
@@ -54,9 +53,25 @@ Tone: Supportive, insightful, direct, and highly encouraging. Use markdown table
 """
 
 # -----------------------------------------------------------------------------
-# 4. Session State & Chat History Management
+# 4. Sidebar Control: Clear Chat History Function
 # -----------------------------------------------------------------------------
-# Initialize the chat session using the persistent client and the upgraded model
+def reset_chat():
+    # Deleting these keys forces a total refresh of the chat objects on the next cycle
+    if "chat" in st.session_state:
+        del st.session_state.chat
+    if "messages" in st.session_state:
+        del st.session_state.messages
+
+with st.sidebar:
+    st.markdown("### Controls")
+    st.button("🧹 Clear Chat History", on_click=reset_chat, use_container_width=True)
+    st.markdown("---")
+    st.caption("Clearing the history resets the AI's memory back to the initial welcoming state.")
+
+# -----------------------------------------------------------------------------
+# 5. Session State & Chat History Management
+# -----------------------------------------------------------------------------
+# Initialize the chat session using the persistent client
 if "chat" not in st.session_state:
     st.session_state.chat = st.session_state.client.chats.create(
         model="gemini-3.5-flash",
@@ -78,10 +93,37 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # -----------------------------------------------------------------------------
-# 5. Handling User Input and Generating Responses
+# 6. Suggested Prompts Feature
 # -----------------------------------------------------------------------------
-if user_prompt := st.chat_input("Ask about careers, colleges, exams, or industries..."):
+# We only show suggestions if the user hasn't engaged in a deep conversation yet
+suggested_prompt = None
+
+if len(st.session_state.messages) <= 1:
+    st.markdown("### 💡 Quick Starters")
+    col1, col2 = st.columns(2)
     
+    with col1:
+        if st.button("🔬 I am in 12th (Physics, Chemistry, Math)", use_container_width=True):
+            suggested_prompt = "I am in 12th grade studying Physics, Chemistry, and Mathematics. What national and international options do I have besides traditional Engineering?"
+        if st.button("🎨 Creative Careers (Art + Tech)", use_container_width=True):
+            suggested_prompt = "I love Design, Tech, and Psychology. What interdisciplinary career options explore these fields globally?"
+            
+    with col2:
+        if st.button("📊 Commerce & Finance Pathways", use_container_width=True):
+            suggested_prompt = "I am a commerce student interested in Investment Banking and Data Analytics. Tell me about top global colleges and exams."
+        if st.button("🌿 Bio-Tech & Healthcare Outlook", use_container_width=True):
+            suggested_prompt = "What are the emerging career options for someone with Biology and Computer Science backgrounds internationally?"
+
+# -----------------------------------------------------------------------------
+# 7. Handling User Input (Text Input or Suggestion Button) and Generating Responses
+# -----------------------------------------------------------------------------
+user_prompt = st.chat_input("Ask about careers, colleges, exams, or industries...")
+
+# If a suggested prompt button was clicked, we override the chat input value
+if suggested_prompt:
+    user_prompt = suggested_prompt
+
+if user_prompt:
     # Display user message immediately
     st.chat_message("user").markdown(user_prompt)
     st.session_state.messages.append({"role": "user", "content": user_prompt})
@@ -100,9 +142,11 @@ if user_prompt := st.chat_input("Ask about careers, colleges, exams, or industri
             # Save assistant response to history
             st.session_state.messages.append({"role": "assistant", "content": response.text})
             
+            # Rerun the script so that the suggestion buttons hide immediately after the first prompt
+            st.rerun()
+            
         except Exception as e:
             st.error(f"An error occurred: {e}")
-            # Safe reset: If the runtime state breaks, clear cache to force clean re-initialization on next run
             if "client" in st.session_state:
                 del st.session_state.client
                 del st.session_state.chat
