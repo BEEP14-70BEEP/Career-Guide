@@ -18,7 +18,6 @@ st.caption("Enter your subjects, core interests, or dream industries to map out 
 # -----------------------------------------------------------------------------
 # 2. API Key Authentication
 # -----------------------------------------------------------------------------
-# Check for API key in Streamlit secrets or sidebar
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
@@ -28,8 +27,9 @@ if not api_key:
     st.info("Please add your Gemini API Key in the sidebar to get started.", icon="🔑")
     st.stop()
 
-# Initialize the Gemini Client
-client = genai.Client(api_key=api_key)
+# Keep the client alive across reruns by saving it to session state
+if "client" not in st.session_state:
+    st.session_state.client = genai.Client(api_key=api_key)
 
 # -----------------------------------------------------------------------------
 # 3. Chatbot System Instructions (The Secret Sauce)
@@ -55,9 +55,9 @@ Tone: Supportive, insightful, direct, and highly encouraging. Use markdown table
 # -----------------------------------------------------------------------------
 # 4. Session State & Chat History Management
 # -----------------------------------------------------------------------------
-# Initialize the chat session if it doesn't exist
+# Initialize the chat session using the persistent client
 if "chat" not in st.session_state:
-    st.session_state.chat = client.chats.create(
+    st.session_state.chat = st.session_state.client.chats.create(
         model="gemini-2.5-flash",
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
@@ -65,13 +65,11 @@ if "chat" not in st.session_state:
         )
     )
 
-# Initialize locally displayed message history for Streamlit UI
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "Hello! I am your AI Career Guide. Tell me about your favorite subjects, your core strengths, or a field you are curious about (e.g., 'I took Physics, Math, and Art' or 'What can I do in Biotech internationally?')."}
+        {"role": "assistant", "content": "Hello! I am your AI Career Guide. Tell me about your favorite subjects, your core strengths, or a field you are curious about."}
     ]
 
-# Display existing chat history
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -81,23 +79,21 @@ for message in st.session_state.messages:
 # -----------------------------------------------------------------------------
 if user_prompt := st.chat_input("Ask about careers, colleges, exams, or industries..."):
     
-    # Display user message immediately
     st.chat_message("user").markdown(user_prompt)
     st.session_state.messages.append({"role": "user", "content": user_prompt})
 
-    # Generate response from Gemini using the ongoing chat session
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         
         try:
-            # Send message to the persistent chat object
+            # Send message through the state-saved chat object
             response = st.session_state.chat.send_message(user_prompt)
-            
-            # Display response
             message_placeholder.markdown(response.text)
-            
-            # Save assistant response to history
             st.session_state.messages.append({"role": "assistant", "content": response.text})
             
         except Exception as e:
             st.error(f"An error occurred: {e}")
+            # Optional: If the client breaks down completely, clear chat cache to force a restart on next input
+            if "client" in st.session_state:
+                del st.session_state.client
+                del st.session_state.chat
