@@ -56,7 +56,6 @@ Tone: Supportive, insightful, direct, and highly encouraging. Use markdown table
 # 4. Sidebar Control: Clear Chat History Function
 # -----------------------------------------------------------------------------
 def reset_chat():
-    # Deleting these keys forces a total refresh of the chat objects on the next cycle
     if "chat" in st.session_state:
         del st.session_state.chat
     if "messages" in st.session_state:
@@ -71,10 +70,10 @@ with st.sidebar:
 # -----------------------------------------------------------------------------
 # 5. Session State & Chat History Management
 # -----------------------------------------------------------------------------
-# Initialize the chat session using the persistent client
+# Initialize the chat session using the production-ready gemini-2.5-pro model
 if "chat" not in st.session_state:
     st.session_state.chat = st.session_state.client.chats.create(
-        model="gemini-2.5-flash",
+        model="gemini-2.5-pro",
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
             temperature=0.7,
@@ -95,7 +94,6 @@ for message in st.session_state.messages:
 # -----------------------------------------------------------------------------
 # 6. Suggested Prompts Feature
 # -----------------------------------------------------------------------------
-# We only show suggestions if the user hasn't engaged in a deep conversation yet
 suggested_prompt = None
 
 if len(st.session_state.messages) <= 1:
@@ -115,34 +113,24 @@ if len(st.session_state.messages) <= 1:
             suggested_prompt = "What are the emerging career options for someone with Biology and Computer Science backgrounds internationally?"
 
 # -----------------------------------------------------------------------------
-# 7. Handling User Input (Text Input or Suggestion Button) and Generating Responses
+# 7. Handling User Input and Generating Responses
 # -----------------------------------------------------------------------------
 user_prompt = st.chat_input("Ask about careers, colleges, exams, or industries...")
 
-# If a suggested prompt button was clicked, we override the chat input value
 if suggested_prompt:
     user_prompt = suggested_prompt
 
 if user_prompt:
-    # Display user message immediately
     st.chat_message("user").markdown(user_prompt)
     st.session_state.messages.append({"role": "user", "content": user_prompt})
 
-    # Generate response from Gemini using the ongoing chat session
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         
         try:
-            # Send message through the state-saved chat object
             response = st.session_state.chat.send_message(user_prompt)
-            
-            # Display response
             message_placeholder.markdown(response.text)
-            
-            # Save assistant response to history
             st.session_state.messages.append({"role": "assistant", "content": response.text})
-            
-            # Rerun the script so that the suggestion buttons hide immediately after the first prompt
             st.rerun()
             
         except Exception as e:
