@@ -70,10 +70,10 @@ with st.sidebar:
 # -----------------------------------------------------------------------------
 # 5. Session State & Chat History Management
 # -----------------------------------------------------------------------------
-# Initialize the chat session using the production-ready gemini-2.5-pro model
+# Using gemini-1.5-flash for maximum free-tier quota limits and stability
 if "chat" not in st.session_state:
     st.session_state.chat = st.session_state.client.chats.create(
-        model="gemini-2.5-pro",
+        model="gemini-1.5-flash",
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
             temperature=0.7,
